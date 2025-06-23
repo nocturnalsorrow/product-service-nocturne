@@ -11,5 +11,5 @@ import java.util.List;
 @Transactional
 public interface ProductImageRepository extends JpaRepository <ProductImage, Long> {
 
-    List<ProductImage> findProductImagesByProduct_Id(Long productId);
+    List<ProductImage> findProductImagesByProductId(Long productId);
 }

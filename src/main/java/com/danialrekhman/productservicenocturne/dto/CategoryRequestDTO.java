@@ -6,7 +6,7 @@ import lombok.*;
 @Setter
 @Builder
 @AllArgsConstructor
-public class ProductImageDTO {
-    private Long id;
-    private String imageUrl;
+public class CategoryRequestDTO {
+    private String name;
+    private Long parentId;
 }

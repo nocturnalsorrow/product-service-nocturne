@@ -12,10 +12,6 @@ import java.util.Optional;
 @Transactional
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    Optional<Category> findByName(String name);
-
-    Optional<Category> findByParentId(Long parentId);
-
     boolean existsByName(String name);
 
     List<Category> findAllByParentId(Long parentId);

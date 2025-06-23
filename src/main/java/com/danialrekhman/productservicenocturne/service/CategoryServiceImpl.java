@@ -1,102 +1,91 @@
 package com.danialrekhman.productservicenocturne.service;
 
+import com.danialrekhman.productservicenocturne.exception.CustomAccessDeniedException;
+import com.danialrekhman.productservicenocturne.exception.DuplicateResourceException;
+import com.danialrekhman.productservicenocturne.exception.ResourceNotFoundException;
 import com.danialrekhman.productservicenocturne.model.Category;
 import com.danialrekhman.productservicenocturne.repository.CategoryRepository;
-import jakarta.persistence.EntityNotFoundException;
-import lombok.AccessLevel;
-import lombok.experimental.FieldDefaults;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
-@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@RequiredArgsConstructor
 public class CategoryServiceImpl implements CategoryService {
 
-    CategoryRepository categoryRepository;
-
-    public CategoryServiceImpl(CategoryRepository categoryRepository) {
-        this.categoryRepository = categoryRepository;
-    }
+    private final CategoryRepository categoryRepository;
 
     @Override
-    public Category createCategory(Category category) {
-        // Безопасно работаем с subcategories, если они заданы
-        if (category.getSubcategories() != null) {
-            for (Category sub : category.getSubcategories()) {
-                sub.setParent(category); // Важно!
-            }
-        }
-
-        // Не передавать ID вручную
-        if (category.getId() != null && categoryRepository.existsById(category.getId())) {
-            throw new IllegalArgumentException("Category with this id already exists");
-        }
-
+    public Category createCategory(Category category, Authentication authentication) {
+        if(!isAdmin(authentication))
+            throw new CustomAccessDeniedException("Only admin can create category.");
+        if (categoryRepository.existsByName(category.getName()))
+            throw new DuplicateResourceException("Category with name '" + category.getName() + "' already exists.");
+        if (category.getSubcategories() != null)
+            category.getSubcategories().forEach(sub -> sub.setParent(category));
         return categoryRepository.save(category);
     }
 
     @Override
-    public Optional<Category> updateCategory(Long id, Category updatedCategory) {
-
-        return categoryRepository.findById(id).map(existingCategory -> {
-            // Проверка на дубликат имени, если имя меняется
-            if (!existingCategory.getName().equals(updatedCategory.getName()) &&
-                    categoryRepository.existsByName(updatedCategory.getName())) {
-                throw new IllegalArgumentException("Category with this name already exists");
-            }
-
-            // Обновляем имя
-            existingCategory.setName(updatedCategory.getName());
-
-            // Обновляем родительскую категорию, если это не сам объект и не null
-            if (updatedCategory.getParent() != null
-                    && updatedCategory.getParent().getId() != null
-                    && !updatedCategory.getParent().getId().equals(id)) {
-                existingCategory.setParent(updatedCategory.getParent());
-            }
-
-            // Сохраняем изменения
-            return categoryRepository.save(existingCategory);
-        });
+    public Category updateCategory(Long id, Category updatedCategory, Authentication authentication) {
+        if(!isAdmin(authentication))
+            throw new CustomAccessDeniedException("Only admin can update category.");
+        Category existingCategory = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category with id " + id + " not found."));
+        if (!existingCategory.getName().equals(updatedCategory.getName()) &&
+                categoryRepository.existsByName(updatedCategory.getName()))
+            throw new DuplicateResourceException("Category with name '" + updatedCategory.getName() + "' already exists.");
+        existingCategory.setName(updatedCategory.getName());
+        if (updatedCategory.getParent() != null && updatedCategory.getParent().getId() != null) {
+            if (updatedCategory.getParent().getId().equals(id))
+                throw new IllegalArgumentException("Category cannot be a parent of itself. Parent ID: " + id + ". Category ID: " + id + ".");
+            Category parent = categoryRepository.findById(updatedCategory.getParent().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent category with id " + updatedCategory.getParent().getId() + " not found."));
+            existingCategory.setParent(parent);
+        } else existingCategory.setParent(null);
+        return categoryRepository.save(existingCategory);
     }
 
     @Override
-    public void deleteCategory(Long id) {
-        if (!categoryRepository.existsById(id)) {
-            throw new EntityNotFoundException("Category not found");
-        }
+    public void deleteCategory(Long id, Authentication authentication) {
+        if(!isAdmin(authentication))
+            throw new CustomAccessDeniedException("Only admin can delete category.");
+        if (!categoryRepository.existsById(id))
+            throw new ResourceNotFoundException("Category with id " + id + " not found for deletion.");
         categoryRepository.deleteById(id);
     }
 
     @Override
-    public Optional<Category> getCategoryById(Long id) {
-
-        if (!categoryRepository.existsById(id))
-            throw new IllegalArgumentException("Category with this id does not exist");
-
-        return categoryRepository.findById(id);
+    public Category getCategoryById(Long id, Authentication authentication) {
+        if(!isAdmin(authentication))
+            throw new CustomAccessDeniedException("Only admin can retrieve category.");
+        return categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category with id " + id + " not found."));
     }
 
     @Override
     public List<Category> getAllCategories() {
-
         return categoryRepository.findAll();
     }
 
     @Override
     public List<Category> getSubcategories(Long parentId) {
-
         if (!categoryRepository.existsById(parentId))
-            throw new IllegalArgumentException("Category with this id does not exist");
-
+            throw new ResourceNotFoundException("Parent category with id " + parentId + " not found for subcategories retrieval.");
         return categoryRepository.findAllByParentId(parentId);
     }
 
     @Override
     public List<Category> getAllParentCategories() {
-
         return categoryRepository.findAllByParentIsNull();
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(role -> role.equals("ROLE_ADMIN"));
     }
 }

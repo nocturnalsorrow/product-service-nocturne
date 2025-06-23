@@ -1,19 +1,19 @@
 package com.danialrekhman.productservicenocturne.service;
 
 import com.danialrekhman.productservicenocturne.model.Category;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface CategoryService {
 
-    Category createCategory(Category category);
+    Category createCategory(Category category, Authentication authentication);
 
-    Optional<Category> updateCategory(Long id, Category updatedCategory);
+    Category updateCategory(Long id, Category updatedCategory, Authentication authentication);
 
-    void deleteCategory(Long id);
+    void deleteCategory(Long id, Authentication authentication);
 
-    Optional<Category> getCategoryById(Long id);
+    Category getCategoryById(Long id, Authentication authentication);
 
     List<Category> getAllCategories();
 

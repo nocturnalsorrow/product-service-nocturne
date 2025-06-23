@@ -1,11 +1,14 @@
 package com.danialrekhman.productservicenocturne.controller;
 
 import com.danialrekhman.productservicenocturne.dto.ProductImageDTO;
+import com.danialrekhman.productservicenocturne.mapper.ProductImageMapper;
 import com.danialrekhman.productservicenocturne.model.ProductImage;
 import com.danialrekhman.productservicenocturne.service.ProductImageService;
 import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,48 +17,33 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/products")
-@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@RequiredArgsConstructor
 public class ProductImageController {
 
-    ProductImageService productImageService;
-
-    public ProductImageController(ProductImageService productImageService) {
-        this.productImageService = productImageService;
-    }
+    private final ProductImageService productImageService;
+    private final ProductImageMapper productImageMapper;
 
     @PostMapping("/{productId}/images")
     public ResponseEntity<ProductImageDTO> addImageToProduct(
             @PathVariable Long productId,
-            @RequestBody ProductImageDTO dto) {
+            @RequestBody ProductImageDTO dto, Authentication authentication) {
 
-        ProductImage image = new ProductImage();
-        image.setImageUrl(dto.getImageUrl());
-        ProductImage saved = productImageService.addImageToProduct(productId, image);
-        return ResponseEntity.ok(toDTO(saved));
+        ProductImage image = productImageMapper.toEntity(dto);
+        ProductImage saved = productImageService.addImageToProduct(productId, image, authentication);
+        return ResponseEntity.ok(productImageMapper.toDto(saved));
     }
 
     @DeleteMapping("/images/{imageId}")
-    public ResponseEntity<Void> deleteImage( @PathVariable Long imageId) {
-
-        productImageService.deleteImage(imageId);
+    public ResponseEntity<Void> deleteImage(@PathVariable Long imageId, Authentication authentication) {
+        productImageService.deleteImage(imageId, authentication);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{productId}/images")
-    public ResponseEntity<List<ProductImageDTO>> getImagesByProduct(@PathVariable Long productId) {
-
+    public ResponseEntity<List<ProductImageDTO>> getImagesByProduct(@PathVariable Long productId, Authentication authentication) {
         return ResponseEntity.ok(
-                productImageService.getImagesByProduct(productId)
-                        .stream()
-                        .map(this::toDTO)
-                        .collect(Collectors.toList()));
-    }
-
-    // Mapper
-    private ProductImageDTO toDTO(ProductImage image) {
-        return ProductImageDTO.builder()
-                .id(image.getId())
-                .imageUrl(image.getImageUrl())
-                .build();
+                productImageService.getImagesByProduct(productId, authentication).stream()
+                        .map(productImageMapper::toDto)
+                        .toList());
     }
 }

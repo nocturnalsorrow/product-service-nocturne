@@ -11,7 +11,7 @@ import java.util.List;
 @Transactional
 public interface ProductRepository  extends JpaRepository<Product, Long> {
 
-    List<Product> findByCategory_Id(Long categoryId);
+    List<Product> findByCategoryId(Long categoryId);
 
     boolean existsByName(String name);
 
